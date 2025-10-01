@@ -32,9 +32,9 @@ _start:
     cmp bl, '+'
     je .after
     cmp bl, '0'
-    jb err
+    jb bad
     cmp bl, '9'
-    ja err
+    ja bad
 .after:
     cmp bl, '+'
     jne .have
@@ -69,4 +69,9 @@ ok:
 err:
     mov rax, 60
     mov rdi, 1
+    syscall
+
+bad:
+    mov rax, 60
+    mov rdi, 2
     syscall
