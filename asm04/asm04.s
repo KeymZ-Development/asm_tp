@@ -1,5 +1,5 @@
 section .bss
-    inbuf resb 64
+    inbuf resb 16
 
 section .text
     global _start
@@ -8,70 +8,82 @@ _start:
     mov rax, 0
     mov rdi, 0
     mov rsi, inbuf
-    mov rdx, 64
+    mov rdx, 16
     syscall
-    cmp rax, 1
-    jl err
 
-    mov rcx, 0
-.skip:
-    mov bl, byte [inbuf + rcx]
-    cmp bl, ' '
-    je .adv
-    cmp bl, 9
-    je .adv
-    cmp bl, 10
-    je .adv
-    jmp .start
-.adv:
-    inc rcx
-    jmp .skip
+    mov rsi, inbuf
+    call to_i
 
-.start:
-    mov bl, byte [inbuf + rcx]
-    cmp bl, '+'
-    je .after
-    cmp bl, '0'
-    jb bad
-    cmp bl, '9'
-    ja bad
-.after:
-    cmp bl, '+'
-    jne .have
-    inc rcx
-.have:
-    mov rdx, -1
-.digits:
-    mov bl, byte [inbuf + rcx]
-    cmp bl, '0'
-    jb .done
-    cmp bl, '9'
-    ja .done
-    mov dl, bl
-    inc rcx
-    jmp .digits
+    cmp rcx, 1
+    je done_bad
+    cmp rcx, 2
+    je done_bad
 
-.done:
-    cmp rdx, -1
-    je err
+    test rax, 1
+    jnz done_odd
 
-    sub rdx, '0'
-    and rdx, 1
-    cmp rdx, 0
-    je ok
-    jmp err
-
-ok:
+done_ok:
     mov rax, 60
     xor rdi, rdi
     syscall
 
-err:
+done_odd:
     mov rax, 60
     mov rdi, 1
     syscall
 
-bad:
+done_bad:
     mov rax, 60
     mov rdi, 2
     syscall
+
+to_i:
+    xor rax, rax
+    xor rbx, rbx
+    xor rcx, rcx
+    xor rdx, rdx
+    
+    mov bl, [rsi]
+    cmp bl, '-'
+    jne .loop
+    mov rdx, 1
+    inc rsi
+    
+.loop:
+    mov bl, [rsi]
+    cmp bl, 10
+    je .done
+    cmp bl, 0
+    je .done
+
+    cmp bl, '0'
+    jl .error
+    cmp bl, '9'
+    jg .error
+
+    sub bl, '0'
+    
+    mov r8, rax
+    imul rax, 10
+    jo .overflow
+    add rax, rbx
+    jo .overflow
+    
+    cmp rax, r8
+    jl .overflow
+    
+    inc rsi
+    jmp .loop
+
+.overflow:
+    mov rcx, 2
+    jmp .done
+
+.error:
+    mov rcx, 1
+.done:
+    test rdx, rdx
+    jz .positive
+    neg rax
+.positive:
+    ret

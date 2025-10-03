@@ -1,33 +1,49 @@
 section .bss
-    outbuf resb 20
+    outbuf resb 65
 
 section .data
     eol db 10
+    hexmap db "0123456789ABCDEF"
+    bflag db "-b", 0
 
 section .text
     global _start
 
 _start:
-    cmp byte [rsp], 3
-    jne err
+    mov r12, 16
+    mov r13, [rsp+16]
 
-    mov rsi, [rsp+16]
+    cmp qword [rsp], 3
+    jne .check
+    mov rdi, [rsp+16]
+    mov rsi, bflag
+    call str_eq
+    cmp rax, 0
+    jne .badflag
+
+    mov r12, 2
+    mov r13, [rsp+24]
+    jmp .check
+
+.badflag:
+    cmp qword [rsp], 3
+    je err
+
+.check:
+    cmp qword [rsp], 2
+    jl err
+
+    mov rsi, r13
     call to_i
     cmp rcx, 1
     je err
-    mov r12, rax
+    
+    test rax, rax
+    js err
 
-    mov rsi, [rsp+24]
-    call to_i
-    cmp rcx, 1
-    je err
-    mov r13, rax
-
-    add r12, r13
-
-    mov rax, r12
     mov rdi, outbuf
-    call to_a
+    mov rsi, r12
+    call to_base
 
     mov rdx, rax
     mov rax, 1
@@ -51,21 +67,38 @@ err:
     mov rdi, 1
     syscall
 
+str_eq:
+    push rsi
+    push rdi
+.scan:
+    mov al, [rdi]
+    mov ah, [rsi]
+    cmp al, ah
+    jne .ne
+    cmp al, 0
+    je .eq
+    inc rsi
+    inc rdi
+    jmp .scan
+.eq:
+    pop rdi
+    pop rsi
+    xor rax, rax
+    ret
+.ne:
+    pop rdi
+    pop rsi
+    mov rax, 1
+    ret
+
 to_i:
     xor rax, rax
     xor rbx, rbx
     xor rcx, rcx
-    mov r10, 1
-
-    cmp byte [rsi], '-'
-    jne .loop
-    mov r10, -1
-    inc rsi
-
-.loop:
+.scan:
     mov bl, [rsi]
     cmp bl, 0
-    je .done
+    je .end
     
     cmp bl, '0'
     jl .error
@@ -76,48 +109,32 @@ to_i:
     imul rax, 10
     add rax, rbx
     inc rsi
-    jmp .loop
-    
+    jmp .scan
 .error:
     mov rcx, 1
     ret
-    
-.done:
-    imul rax, r10
+.end:
     ret
 
-to_a:
+to_base:
     mov r8, rdi
-    mov r9, 10
-    mov r11, 0
-
-    test rax, rax
-    jns .convert
-    neg rax
-    mov r11, 1
-
-.convert:
-    add rdi, 19
+    mov r9, rsi
+    add rdi, 64
     mov byte [rdi], 0
     dec rdi
-.loop:
+.digits:
     xor rdx, rdx
     div r9
-    add dl, '0'
-    mov [rdi], dl
+    lea r10, [hexmap]
+    mov r10b, [r10+rdx]
+    mov [rdi], r10b
     dec rdi
     test rax, rax
-    jnz .loop
+    jnz .digits
 
-    cmp r11, 1
-    jne .copy
-    mov byte [rdi], '-'
-    dec rdi
-
-.copy:
     inc rdi
     mov rdx, r8
-    add rdx, 20
+    add rdx, 65
     sub rdx, rdi
     mov rax, rdx
 

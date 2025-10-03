@@ -1,5 +1,5 @@
 section .bss
-    buffer resb 16
+    inbuf resb 16
 
 section .text
     global _start
@@ -7,73 +7,91 @@ section .text
 _start:
     mov rax, 0
     mov rdi, 0
-    mov rsi, buffer
+    mov rsi, inbuf
     mov rdx, 16
     syscall
 
-    mov rsi, buffer
-    call ascii_to_int
+    mov rsi, inbuf
+    call to_i
+    
+    test rax, rax
+    js done_fail
 
-    call is_prime
-    cmp rax, 0
-    je exit_prime
+    call is_p
+    cmp rax, 1
+    je done_ok
 
-exit_not_prime:
+done_fail:
     mov rax, 60
     mov rdi, 1
     syscall
 
-exit_prime:
+done_ok:
     mov rax, 60
     xor rdi, rdi
     syscall
 
-ascii_to_int:
+to_i:
     xor rax, rax
     xor rbx, rbx
-.loop:
+    xor rdx, rdx
+    
+    cmp byte [rsi], '-'
+    jne .scan
+    mov rdx, 1
+    inc rsi
+    
+.scan:
     mov bl, [rsi]
     cmp bl, 10
-    je .done
+    je .end
+    cmp bl, 0
+    je .end
     cmp bl, '0'
-    jb .invalid
+    jb .bad
     cmp bl, '9'
-    ja .invalid
+    ja .bad
     sub bl, '0'
     imul rax, 10
     add rax, rbx
     inc rsi
-    jmp .loop
-.done:
+    jmp .scan
+.end:
+    test rdx, rdx
+    jz .pos
+    neg rax
+.pos:
     ret
-.invalid:
+.bad:
     mov rax, 60
     mov rdi, 2
     syscall
 
-is_prime:
+is_p:
     cmp rax, 2
-    jb .not_prime
+    jb .not
+    cmp rax, 2
+    je .yes
     
     mov rbx, rax
     mov rcx, 2
     
-.check_loop:
+.trial:
     mov rax, rbx
     xor rdx, rdx
     div rcx
     cmp rdx, 0
-    je .not_prime
+    je .not
     
     inc rcx
     mov rax, rcx
     imul rax, rax
     cmp rax, rbx
-    jbe .check_loop
+    jbe .trial
     
-.prime:
-    xor rax, rax
-    ret
-.not_prime:
+.yes:
     mov rax, 1
+    ret
+.not:
+    xor rax, rax
     ret

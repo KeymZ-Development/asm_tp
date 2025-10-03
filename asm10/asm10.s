@@ -1,5 +1,4 @@
 section .bss
-    inbuf resb 32
     outbuf resb 32
 
 section .data
@@ -10,18 +9,28 @@ section .text
     global _start
 
 _start:
-    cmp qword [rsp], 2
+    cmp qword [rsp], 4
     jne err
 
     mov rsi, [rsp+16]
     call to_i
-    mov rbx, rax
+    mov r12, rax
 
-    mov rax, rbx
-    dec rax
-    imul rax, rbx
-    shr rax, 1
-    
+    mov rsi, [rsp+24]
+    call to_i
+    cmp r12, rax
+    jge .s1
+    mov r12, rax
+.s1:
+
+    mov rsi, [rsp+32]
+    call to_i
+    cmp r12, rax
+    jge .s2
+    mov r12, rax
+.s2:
+
+    mov rax, r12
     mov rdi, outbuf
     call to_a
 
@@ -37,6 +46,7 @@ _start:
     mov rdx, 1
     syscall
 
+ok:
     mov rax, 60
     xor rdi, rdi
     syscall
@@ -48,42 +58,66 @@ err:
 
 to_i:
     xor rax, rax
+    xor rbx, rbx
+    xor r10, r10
+    
+    cmp byte [rsi], '-'
+    jne .scan
+    mov r10, 1
+    inc rsi
+    
 .scan:
-    movzx rdx, byte [rsi]
-    cmp dl, 10
+    mov bl, [rsi]
+    cmp bl, 0
     je .end
-    cmp dl, 0
-    je .end
-    cmp dl, '0'
-    jb .end
-    cmp dl, '9'
-    ja .end
-    sub dl, '0'
-    imul rax, rax, 10
-    add rax, rdx
+    sub bl, '0'
+    imul rax, 10
+    add rax, rbx
     inc rsi
     jmp .scan
 .end:
+    test r10, r10
+    jz .pos
+    neg rax
+.pos:
     ret
 
 to_a:
     mov r8, rdi
+    mov r11, 0
+    
+    test rax, rax
+    jns .conv
+    neg rax
+    mov r11, 1
+    
+.conv:
     add rdi, 31
     mov byte [rdi], 0
     dec rdi
-.digits:
+.scan:
     xor rdx, rdx
     div qword [dec10]
     add dl, '0'
     mov [rdi], dl
     dec rdi
     test rax, rax
-    jnz .digits
+    jnz .scan
+
+    cmp r11, 1
+    jne .cpy
+    mov byte [rdi], '-'
+    dec rdi
+
+.cpy:
     inc rdi
+    mov rdx, r8
+    add rdx, 32
+    sub rdx, rdi
+    mov rax, rdx
+
+    mov rcx, rax
     mov rsi, rdi
     mov rdi, r8
-    mov rcx, 32
     rep movsb
-    mov rax, rsi
-    sub rax, r8
     ret
