@@ -1,11 +1,11 @@
 section .data
-    needle db "42", 0x0A
-    needle_len equ $ - needle
-    answer db "1337", 0x0A
-    answer_len equ $ - answer
+    expected db "42", 0x0A
+    expected_len equ $ - expected
+    output db "1337", 0x0A
+    output_len equ $ - output
 
 section .bss
-    inbuf resb 8
+    buffer resb 1024
 
 section .text
     global _start
@@ -13,31 +13,34 @@ section .text
 _start:
     mov rax, 0
     mov rdi, 0
-    mov rsi, inbuf
-    mov rdx, 8
+    mov rsi, buffer
+    mov rdx, 1024
     syscall
 
-    cmp rax, needle_len
-    jne done_err
+    cmp rax, 0
+    jle exit_failure
 
-    mov rsi, inbuf
-    mov rdi, needle
-    mov rcx, needle_len
+    cmp rax, expected_len
+    jl exit_failure
+
+    mov rsi, buffer
+    mov rdi, expected
+    mov rcx, expected_len
     repe cmpsb
-    jne done_err
+    jne exit_failure
 
     mov rax, 1
     mov rdi, 1
-    mov rsi, answer
-    mov rdx, answer_len
+    mov rsi, output
+    mov rdx, output_len
     syscall
 
-done_ok:
+exit_success:
     mov rax, 60
     xor rdi, rdi
     syscall
 
-done_err:
+exit_failure:
     mov rax, 60
     mov rdi, 1
     syscall
